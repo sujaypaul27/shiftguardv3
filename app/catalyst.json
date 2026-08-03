@@ -1,0 +1,18 @@
+{
+  "appsail": [
+    {
+      "source": ".",
+      "name": "AppSail",
+      "build": "target",
+      "stack": "java21",
+      "platform": "JavaSE",
+      "start": "java -jar app-0.0.1-SNAPSHOT.jar"
+    }
+  ],
+  "slate": [
+    {
+      "name": "slate",
+      "source": "C:\\Users\\Paul\\shiftguardv3\\app\\slate"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# Java / Maven (app folder)
+app/target/
+app/.idea/
+app/.mvn/wrapper/maven-wrapper.jar
+*.class
+
+# Node / Vite (slate folder)
+slate/node_modules/
+slate/dist/
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
