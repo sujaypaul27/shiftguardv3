@@ -26,17 +26,31 @@ public class ScheduleController {
     @PostMapping("/validate")
     public Map<String, Object> validate(
             HttpServletRequest request,
-            @RequestBody Map<String, Object> body) throws Exception {
-
-        Long employeeId = Long.valueOf(body.get("employeeId").toString());
-        Long shiftId = Long.valueOf(body.get("shiftId").toString());
-
-        ValidationResult result = scheduleService.validateAssignment(request, employeeId, shiftId);
+            @RequestBody Map<String, Object> body) {
 
         Map<String, Object> response = new HashMap<>();
-        response.put("valid", result.isValid());
-        response.put("violatedRule", result.getViolatedRule());
-        response.put("message", result.getMessage());
+
+        try {
+            if (body == null || !body.containsKey("employeeId") || !body.containsKey("shiftId")) {
+                response.put("error", "employeeId and shiftId are required");
+                response.put("type", "validation_error");
+                return response;
+            }
+
+            Long employeeId = Long.valueOf(body.get("employeeId").toString());
+            Long shiftId = Long.valueOf(body.get("shiftId").toString());
+
+            ValidationResult result = scheduleService.validateAssignment(request, employeeId, shiftId);
+
+            response.put("valid", result.isValid());
+            response.put("violatedRule", result.getViolatedRule());
+            response.put("message", result.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("error", e.getMessage());
+            response.put("type", e.getClass().getName());
+        }
+
         return response;
     }
 }

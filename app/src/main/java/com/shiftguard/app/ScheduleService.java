@@ -16,43 +16,43 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
-
 @Service
 public class ScheduleService {
 
+    // TODO: Replace these with your actual Catalyst Data Store table IDs.
     private static final Long EMPLOYEE_TABLE_ID = 60819000000018632L;
     private static final Long SHIFT_TABLE_ID = 60819000000018997L;
     private static final Long UNAVAILABILITY_TABLE_ID = 60819000000034362L;
-    private static final Long ASSIGNMENTS_TABLE_ID = 60819000000034725L; // change if your assignments table ID differs
+    private static final Long ASSIGNMENTS_TABLE_ID = 60819000000034725L;
 
     private final ScheduleSolver scheduleSolver = new ScheduleSolver();
 
     public ScheduleResult generateSchedule(HttpServletRequest request) throws Exception {
-        CatalystSDK.init(new AuthProviderImpl(request));
+        initCatalyst(request);
 
-        List<Employee> employees = fetchEmployees();
-        List<Shift> shifts = fetchShifts();
-        List<Unavailability> unavailability = fetchUnavailability();
-        List<Assignment> assignments = fetchAssignments();
+        List<Employee> employees = fetchEmployeesFromDataStore();
+        List<Shift> shifts = fetchShiftsFromDataStore();
+        List<Unavailability> unavailability = fetchUnavailabilityFromDataStore();
+        List<Assignment> assignments = fetchAssignmentsFromDataStore();
 
         return scheduleSolver.generateSchedule(employees, shifts, unavailability, assignments);
     }
 
     public ValidationResult validateAssignment(HttpServletRequest request, Long employeeId, Long shiftId) throws Exception {
-        CatalystSDK.init(new AuthProviderImpl(request));
+        initCatalyst(request);
 
-        List<Employee> employees = fetchEmployees();
-        List<Shift> shifts = fetchShifts();
-        List<Unavailability> unavailability = fetchUnavailability();
-        List<Assignment> assignments = fetchAssignments();
+        List<Employee> employees = fetchEmployeesFromDataStore();
+        List<Shift> shifts = fetchShiftsFromDataStore();
+        List<Unavailability> unavailability = fetchUnavailabilityFromDataStore();
+        List<Assignment> assignments = fetchAssignmentsFromDataStore();
 
         Employee employee = employees.stream()
-                .filter(e -> e.getId().equals(employeeId))
+                .filter(e -> e.getId() != null && e.getId().equals(employeeId))
                 .findFirst()
                 .orElse(null);
 
         Shift shift = shifts.stream()
-                .filter(s -> s.getId().equals(shiftId))
+                .filter(s -> s.getId() != null && s.getId().equals(shiftId))
                 .findFirst()
                 .orElse(null);
 
@@ -67,7 +67,11 @@ public class ScheduleService {
         return scheduleSolver.validateAssignment(employee, shift, unavailability, assignments);
     }
 
-    private List<Employee> fetchEmployees() throws Exception {
+    private void initCatalyst(HttpServletRequest request) {
+        CatalystSDK.init(new AuthProviderImpl(request));
+    }
+
+    private List<Employee> fetchEmployeesFromDataStore() throws Exception {
         List<Employee> result = new ArrayList<>();
         ZCObject obj = ZCObject.getInstance();
         var table = obj.getTable(EMPLOYEE_TABLE_ID);
@@ -84,7 +88,7 @@ public class ScheduleService {
         return result;
     }
 
-    private List<Shift> fetchShifts() throws Exception {
+    private List<Shift> fetchShiftsFromDataStore() throws Exception {
         List<Shift> result = new ArrayList<>();
         ZCObject obj = ZCObject.getInstance();
         var table = obj.getTable(SHIFT_TABLE_ID);
@@ -101,7 +105,7 @@ public class ScheduleService {
         return result;
     }
 
-    private List<Unavailability> fetchUnavailability() throws Exception {
+    private List<Unavailability> fetchUnavailabilityFromDataStore() throws Exception {
         List<Unavailability> result = new ArrayList<>();
         ZCObject obj = ZCObject.getInstance();
         var table = obj.getTable(UNAVAILABILITY_TABLE_ID);
@@ -117,7 +121,7 @@ public class ScheduleService {
         return result;
     }
 
-    private List<Assignment> fetchAssignments() throws Exception {
+    private List<Assignment> fetchAssignmentsFromDataStore() throws Exception {
         List<Assignment> result = new ArrayList<>();
         ZCObject obj = ZCObject.getInstance();
         var table = obj.getTable(ASSIGNMENTS_TABLE_ID);
