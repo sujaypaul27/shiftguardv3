@@ -38,6 +38,7 @@ class ScheduleSolverTest {
         assertTrue(result.getAssignments().size() > 0);
         assertNotNull(result.getMessage());
     }
+
     @Test
     void validateAssignment_shouldRejectWhenMaxWeeklyHoursExceeded() {
         Employee employee = new Employee(1L, "Asha", "Staff", 8);
@@ -49,7 +50,7 @@ class ScheduleSolverTest {
         );
 
         ScheduleSolver solver = new ScheduleSolver();
-        ValidationResult result = solver.validateAssignment(employee, shift, unavailability, currentAssignments);
+        ValidationResult result = solver.validateAssignment(employee, shift, List.of(shift), unavailability, currentAssignments);
 
         assertFalse(result.isValid());
         assertEquals("max_weekly_hours", result.getViolatedRule());
@@ -87,9 +88,32 @@ class ScheduleSolverTest {
         );
 
         ScheduleSolver solver = new ScheduleSolver();
-        ValidationResult result = solver.validateAssignment(employee, shift, unavailability, List.of());
+        ValidationResult result = solver.validateAssignment(employee, shift, List.of(shift), unavailability, List.of());
 
         assertFalse(result.isValid());
         assertEquals("unavailability", result.getViolatedRule());
+    }
+
+    @Test
+    void validateAssignment_shouldRejectBackToBackClosingThenOpening() {
+        // Employee worked Monday Evening (closing) already; now trying to validate
+        // Tuesday Morning (opening) — this should be rejected under the back-to-back rule.
+        Employee employee = new Employee(1L, "Asha", "Staff", 40);
+
+        Shift mondayEvening = new Shift(101L, "Monday", "Evening", 1);
+        Shift tuesdayMorning = new Shift(102L, "Tuesday", "Morning", 1);
+        List<Shift> allShifts = List.of(mondayEvening, tuesdayMorning);
+
+        List<Unavailability> unavailability = List.of();
+        List<Assignment> currentAssignments = List.of(
+                new Assignment(1L, 1L, 101L, "confirmed") // already worked Monday Evening
+        );
+
+        ScheduleSolver solver = new ScheduleSolver();
+        ValidationResult result = solver.validateAssignment(
+                employee, tuesdayMorning, allShifts, unavailability, currentAssignments);
+
+        assertFalse(result.isValid());
+        assertEquals("back_to_back", result.getViolatedRule());
     }
 }
