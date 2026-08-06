@@ -1,46 +1,27 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Users, Calendar, CheckCircle2, Percent } from 'lucide-react';
+import React from "react";
+import { Users, Calendar, CheckCircle2, Zap } from "lucide-react";
 
-export default function MetricsOverview({ employees, shifts, assignments }) {
-    const totalSlots = shifts.length || 14;
-    const assignedCount = assignments.length;
-    const fillRate = totalSlots > 0 ? Math.round((assignedCount / totalSlots) * 100) : 0;
-
-    const metrics = [
-        { label: 'Total Employees', value: employees.length, icon: Users, color: '#3b82f6' },
-        { label: 'Weekly Fixed Shifts', value: shifts.length, icon: Calendar, color: '#06b6d4' },
-        { label: 'Assigned Slots', value: assignedCount, icon: CheckCircle2, color: '#10b981' },
-        { label: 'Schedule Fill Rate', value: `${fillRate}%`, icon: Percent, color: '#6366f1' },
-    ];
-
+function StatCard({ label, value, icon: Icon, accent }) {
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-            {metrics.map((m, idx) => {
-                const Icon = m.icon;
-                return (
-                    <motion.div
-                        key={m.label}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2, delay: idx * 0.05 }}
-                        className="glass-card"
-                        style={{ padding: '20px' }}
-                    >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {m.label}
-              </span>
-                            <div style={{ padding: '6px', borderRadius: '6px', background: `${m.color}15`, color: m.color }}>
-                                <Icon size={16} />
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '26px', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                            {m.value}
-                        </div>
-                    </motion.div>
-                );
-            })}
+        <div className="sg-stat-card">
+            <div className="sg-stat-top">
+                <span className="sg-stat-label">{label}</span>
+                <span className={`sg-stat-icon ${accent || ""}`}>
+          <Icon size={13} strokeWidth={2.2} />
+        </span>
+            </div>
+            <div className="sg-stat-value">{value}</div>
+        </div>
+    );
+}
+
+export default function MetricsOverview({ employeeCount, shiftCount, filledCount, fillRate }) {
+    return (
+        <div className="sg-stat-row">
+            <StatCard label="Total Employees" value={employeeCount} icon={Users} />
+            <StatCard label="Weekly Fixed Shifts" value={shiftCount || 14} icon={Calendar} />
+            <StatCard label="Assigned Slots" value={filledCount} icon={CheckCircle2} accent="teal" />
+            <StatCard label="Schedule Fill Rate" value={`${fillRate}%`} icon={Zap} accent="amber" />
         </div>
     );
 }

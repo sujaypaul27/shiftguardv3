@@ -1,46 +1,40 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import React, { useEffect } from "react";
+import { CheckCircle2, XCircle, Info } from "lucide-react";
 
-export default function Toast({ message }) {
-    if (!message || !message.text) return null;
+export default function Toast({ toasts, removeToast }) {
+    if (!toasts?.length) return null;
+    return (
+        <div className="sg-toast-stack">
+            {toasts.map((t) => (
+                <ToastItem key={t.id} toast={t} onDone={() => removeToast(t.id)} />
+            ))}
+        </div>
+    );
+}
 
-    const isError = message.type === 'error';
-    const isSuccess = message.type === 'success';
+function ToastItem({ toast, onDone }) {
+    useEffect(() => {
+        const timer = setTimeout(onDone, 3500);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const Icon = toast.type === "success" ? CheckCircle2 : toast.type === "error" ? XCircle : Info;
 
     return (
-        <AnimatePresence>
-            <motion.div
-                initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                style={{
-                    position: 'fixed',
-                    top: '20px',
-                    right: '20px',
-                    zIndex: 100,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 18px',
-                    borderRadius: '8px',
-                    background: isError ? 'rgba(244, 63, 94, 0.15)' : isSuccess ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                    border: `1px solid ${isError ? 'var(--accent-rose)' : isSuccess ? 'var(--accent-emerald)' : 'var(--accent-primary)'}`,
-                    backdropFilter: 'blur(16px)',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)'
-                }}
-            >
-                {isError ? <AlertCircle size={18} color="var(--accent-rose)" /> : isSuccess ? <CheckCircle2 size={18} color="var(--accent-emerald)" /> : <Info size={18} color="var(--accent-primary)" />}
-
-                <div>
-                    {message.rule && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'var(--font-mono)', padding: '2px 6px', background: 'rgba(0,0,0,0.4)', borderRadius: '4px', marginRight: '8px', textTransform: 'uppercase', color: 'var(--text-primary)' }}>
-              {message.rule}
-            </span>
-                    )}
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{message.text}</span>
-                </div>
-            </motion.div>
-        </AnimatePresence>
+        <div className={`sg-toast sg-toast-${toast.type}`}>
+            <Icon size={15} />
+            <span>{toast.message}</span>
+        </div>
     );
+}
+
+export function useToasts() {
+    const [toasts, setToasts] = React.useState([]);
+    const pushToast = (type, message) => {
+        const id = Date.now() + Math.random();
+        setToasts((t) => [...t, { id, type, message }]);
+    };
+    const removeToast = (id) => setToasts((t) => t.filter((x) => x.id !== id));
+    return { toasts, pushToast, removeToast };
 }

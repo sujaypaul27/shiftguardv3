@@ -1,38 +1,56 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Cpu, ShieldAlert, CheckCircle, Zap } from 'lucide-react';
+import React from "react";
+import { CheckCircle2 } from "lucide-react";
 
-export default function SolverConsole({ statusMessage, loading }) {
-    const rules = [
-        { name: 'Max Weekly Hours', key: 'max_weekly_hours', desc: 'Prevents overworking beyond limits' },
-        { name: 'Back-to-Back Rest', key: 'back_to_back', desc: 'Restricts Evening -> Morning shifts' },
-        { name: 'Unavailability', key: 'unavailability', desc: 'Respects employee unavailabilities' }
-    ];
-
+function ConstraintChip({ title, sub }) {
     return (
-        <div className="glass-panel" style={{ padding: '20px', marginBottom: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Cpu size={18} color="var(--accent-primary)" />
-                    <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        Constraint Solver Engine Status
-                    </h3>
+        <div className="sg-chip">
+            <CheckCircle2 size={14} className="sg-chip-icon" />
+            <div>
+                <div className="sg-chip-title">{title}</div>
+                <div className="sg-chip-sub">{sub}</div>
+            </div>
+        </div>
+    );
+}
+
+export function ConstraintRow() {
+    return (
+        <div className="sg-constraint-row">
+            <ConstraintChip title="Max Weekly Hours" sub="Prevents overworking beyond limits" />
+            <ConstraintChip title="Back-to-Back Rest" sub="Restricts Evening → Morning shifts" />
+            <ConstraintChip title="Unavailability" sub="Respects employee unavailabilities" />
+        </div>
+    );
+}
+
+const RULES = [
+    { title: "Maximum Weekly Hours Limit", sub: "Ensures no employee exceeds designated weekly maximum hours." },
+    { title: "Rest Period Enforcement", sub: "Prevents scheduling an Evening shift followed immediately by next-day Morning shift." },
+    { title: "Unavailability Blackout Windows", sub: "Strictly respects non-working slots declared by employees." },
+    { title: "Single Assignment Per Slot", sub: "Guarantees an employee is assigned at most once per shift slot." },
+];
+
+export default function SolverConsole() {
+    return (
+        <div className="sg-panel">
+            <div className="sg-panel-head">
+                <div>
+                    <h2>Constraint Solver Engine</h2>
+                    <p>Algorithmic rules and backend solver pipeline configuration</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: loading ? 'var(--accent-amber)' : 'var(--accent-emerald)' }}>
-                    <Zap size={12} />
-                    <span>{loading ? 'Greedy Assignment Active...' : 'Engine Idle / Ready'}</span>
-                </div>
+                <span className="sg-panel-note">Engine Idle / Ready</span>
             </div>
 
-            {/* Rules Indicator Badges */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                {rules.map(r => (
-                    <div key={r.key} style={{ padding: '10px 12px', background: 'var(--bg-app)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>{r.name}</span>
-                            <CheckCircle size={12} color="var(--accent-emerald)" />
+            <ConstraintRow />
+
+            <div className="sg-rule-list">
+                {RULES.map((r) => (
+                    <div key={r.title} className="sg-rule-row">
+                        <div>
+                            <div className="sg-rule-title">{r.title}</div>
+                            <div className="sg-rule-sub">{r.sub}</div>
                         </div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{r.desc}</div>
+                        <span className="sg-rule-badge">Active</span>
                     </div>
                 ))}
             </div>

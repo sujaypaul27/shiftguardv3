@@ -1,19 +1,25 @@
-import axios from 'axios';
+export const API_BASE = "https://appsail-50044605574.development.catalystappsail.in";
 
-const BASE_URL = 'https://appsail-50044605574.development.catalystappsail.in';
+export async function apiGet(path) {
+    const res = await fetch(`${API_BASE}${path}`, {
+        headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`GET ${path} -> ${res.status}`);
+    return res.json();
+}
 
-export const apiClient = axios.create({
-    baseURL: BASE_URL,
-    withCredentials: true,
-    headers: {
-        'Content-Type': 'application/json'
-    }
-});
+export async function apiPost(path, body) {
+    const res = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) throw new Error(`POST ${path} -> ${res.status}`);
+    return res.json();
+}
 
-export const ShiftGuardAPI = {
-    getEmployees: () => apiClient.get('/employees'),
-    getShifts: () => apiClient.get('/shifts'),
-    generateSchedule: () => apiClient.post('/schedule/generate'),
-    validateAssignment: (employeeId, shiftId) =>
-        apiClient.post('/schedule/validate', { employeeId, shiftId })
-};
+export const getEmployees = () => apiGet("/employees");
+export const getShifts = () => apiGet("/shifts");
+export const generateSchedule = () => apiPost("/schedule/generate", null);
+export const validateAssignment = (employeeId, shiftId) =>
+    apiPost("/schedule/validate", { employeeId, shiftId });
