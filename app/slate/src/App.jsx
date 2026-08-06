@@ -1,25 +1,35 @@
 import React, { useState, useEffect } from 'react';
+import Sidebar from './components/Sidebar';
+import Navbar from './components/Navbar';
+import MetricsOverview from './components/MetricsOverview';
+import SolverConsole from './components/SolverConsole';
+import SchedulerGrid from './components/SchedulerGrid';
+import Toast from './components/Toast';
 import { ShiftGuardAPI } from './api/client';
-import './App.css';
-
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const SLOTS = ["Morning", "Evening"];
+import { Users, Cpu, Activity, Clock, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState('schedule');
   const [employees, setEmployees] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [assignments, setAssignments] = useState([]);
-  const [unfilledShifts, setUnfilledShifts] = useState([]);
-
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [loading, setLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState({ type: 'info', rule: 'READY', text: 'ShiftGuard engine initialized.' });
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([
+    { id: 1, time: '10:18:02 PM', event: 'SYSTEM_INIT', details: 'ShiftGuard Frontend v3.0 initialized', level: 'info' }
+  ]);
 
   useEffect(() => {
-    loadInitialData();
+    loadData();
   }, []);
 
-  const loadInitialData = async () => {
+  const addLog = (event, details, level = 'info') => {
+    const time = new Date().toLocaleTimeString();
+    setAuditLogs(prev => [{ id: Date.now(), time, event, details, level }, ...prev]);
+  };
+
+  const loadData = async () => {
     setLoading(true);
     try {
       const [empRes, shiftRes] = await Promise.all([
@@ -28,33 +38,38 @@ export default function App() {
       ]);
       setEmployees(empRes.data || []);
       setShifts(shiftRes.data || []);
-      setStatusMessage({ type: 'info', rule: 'LOADED', text: 'Employees and fixed shift slots synchronized.' });
+      setStatusMessage({ type: 'success', rule: 'CONNECTED', text: 'AppSail Data Store synchronized successfully.' });
+      addLog('DATA_SYNC', 'Successfully fetched workforce roster and shift matrix from backend.', 'success');
     } catch (err) {
       console.error(err);
-      setStatusMessage({ type: 'error', rule: 'NETWORK_ERR', text: 'Could not connect to AppSail backend.' });
+      setStatusMessage({ type: 'error', rule: 'FETCH_ERROR', text: 'Could not connect to AppSail backend.' });
+      addLog('BACKEND_DISCONNECTED', 'Failed to reach Java Spring Boot backend at AppSail endpoint.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGenerateSchedule = async () => {
+  const handleGenerate = async () => {
     setLoading(true);
-    setStatusMessage({ type: 'info', rule: 'SOLVER_RUNNING', text: 'Executing greedy assignment algorithm against active constraints...' });
-    try {
-      const response = await ShiftGuardAPI.generateSchedule();
-      const { assignments: resultAssignments, unfilledShifts: resultUnfilled, fullyScheduled, message } = response.data;
+    setStatusMessage({ type: 'info', rule: 'SOLVER_RUNNING', text: 'Executing constraint solver pipeline...' });
+    addLog('SOLVER_START', 'Initiated automated constraint solver pipeline execution.', 'info');
 
+    try {
+      const res = await ShiftGuardAPI.generateSchedule();
+      const { assignments: resultAssignments, unfilledShifts, fullyScheduled, message } = res.data;
       setAssignments(resultAssignments || []);
-      setUnfilledShifts(resultUnfilled || []);
 
       if (fullyScheduled) {
-        setStatusMessage({ type: 'success', rule: 'SOLVED_OK', text: `Weekly schedule solved! ${message || ''}` });
+        setStatusMessage({ type: 'success', rule: 'SOLVED', text: `Weekly schedule solved! ${message || ''}` });
+        addLog('SOLVER_SUCCESS', `Solver completed with zero hard constraint violations.`, 'success');
       } else {
-        setStatusMessage({ type: 'warning', rule: 'PARTIAL_FEASIBLE', text: `Generated partial schedule (${resultUnfilled.length} unfilled slots remaining).` });
+        setStatusMessage({ type: 'error', rule: 'PARTIAL', text: `Partial schedule generated (${unfilledShifts?.length || 0} unfilled).` });
+        addLog('SOLVER_PARTIAL', `Solver completed with ${unfilledShifts?.length || 0} unfilled slots.`, 'warning');
       }
     } catch (err) {
       console.error(err);
-      setStatusMessage({ type: 'error', rule: 'SOLVER_FAILED', text: 'Solver pipeline execution error.' });
+      setStatusMessage({ type: 'error', rule: 'SOLVER_FAILED', text: 'Schedule generation pipeline failed.' });
+      addLog('SOLVER_ERROR', 'Constraint solver failed during backend pipeline execution.', 'error');
     } finally {
       setLoading(false);
     }
@@ -62,7 +77,7 @@ export default function App() {
 
   const handleSlotClick = async (shift) => {
     if (!selectedEmployeeId) {
-      setStatusMessage({ type: 'warning', rule: 'NO_SELECTION', text: 'Please choose an employee from the dropdown before assigning.' });
+      setStatusMessage({ type: 'error', rule: 'NO_SELECTION', text: 'Please select an employee from the dropdown first.' });
       return;
     }
 
@@ -75,180 +90,168 @@ export default function App() {
       const { valid, violatedRule, message } = res.data;
 
       if (valid) {
-        const newAssignment = { employeeId: empId, shiftId: shift.id, status: 'confirmed' };
-        setAssignments(prev => [...prev.filter(a => !(a.shiftId === shift.id && a.employeeId === empId)), newAssignment]);
-        setStatusMessage({
-          type: 'success',
-          rule: 'VALIDATED',
-          text: `Successfully assigned ${emp ? emp.name : 'employee'} to ${shift.day} ${shift.slotType || shift.slot_type}.`
-        });
+        const newAssign = { employeeId: empId, shiftId: shift.id, status: 'confirmed' };
+        setAssignments(prev => [...prev.filter(a => !(a.shiftId === shift.id && a.employeeId === empId)), newAssign]);
+        setStatusMessage({ type: 'success', rule: 'VALIDATED', text: `Assigned ${emp?.name || 'employee'} to ${shift.day} ${shift.slotType || shift.slot_type}` });
+        addLog('MANUAL_ASSIGN', `Assigned ${emp?.name || empId} to shift #${shift.id}`, 'success');
       } else {
-        setStatusMessage({
-          type: 'error',
-          rule: violatedRule || 'CONSTRAINT_VIOLATION',
-          text: message || 'Selected shift violates active operational constraints.'
-        });
+        setStatusMessage({ type: 'error', rule: violatedRule?.toUpperCase() || 'RULE_VIOLATION', text: message || 'Constraint violation.' });
+        addLog('VALIDATION_FAILED', `Manual assignment blocked: ${violatedRule}`, 'error');
       }
     } catch (err) {
       console.error(err);
-      setStatusMessage({ type: 'error', rule: 'VALIDATION_ERR', text: 'Failed to complete constraint validation.' });
+      setStatusMessage({ type: 'error', rule: 'VALIDATION_ERR', text: 'Manual validation request failed.' });
+      addLog('API_ERROR', 'Failed to validate assignment with backend server.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const getShift = (day, slot) => {
-    return shifts.find(s => s.day === day && (s.slotType === slot || s.slot_type === slot));
-  };
-
-  const getAssignedEmployees = (shiftId) => {
-    if (!shiftId) return [];
-    const assignedIds = assignments
-        .filter(a => a.shiftId === shiftId || a.shift_id === shiftId)
-        .map(a => a.employeeId || a.employee_id);
-    return employees.filter(e => assignedIds.includes(e.id));
-  };
-
-  // Metrics computations
-  const totalSlots = shifts.length || 14;
-  const filledCount = assignments.length;
-  const coveragePercent = totalSlots > 0 ? Math.round((filledCount / totalSlots) * 100) : 0;
-
   return (
-      <div className="dashboard-container">
-        {/* Enterprise Header */}
-        <header className="header-bar">
-          <div className="brand-section">
-            <div className="brand-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-            </div>
-            <div>
-              <h1 className="brand-title">ShiftGuard</h1>
-              <p className="brand-subtitle">Automated Constraint Solver & Workforce Scheduler</p>
-            </div>
-          </div>
-          <div className="system-status">
-            <span className="status-dot"></span>
-            AppSail Engine Active
-          </div>
-        </header>
+      <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
+        <Toast message={statusMessage} />
 
-        {/* Realtime Stat Cards */}
-        <div className="metrics-grid">
-          <div className="metric-card">
-            <div className="metric-label">Staff Pool</div>
-            <div className="metric-value">{employees.length}</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Weekly Shifts</div>
-            <div className="metric-value">{shifts.length}</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Scheduled Slots</div>
-            <div className="metric-value">{assignments.length}</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Schedule Fill Rate</div>
-            <div className="metric-value" style={{ color: coveragePercent === 100 ? 'var(--accent-emerald)' : 'var(--accent-blue)' }}>
-              {coveragePercent}%
-            </div>
-          </div>
-        </div>
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-        {/* Control Panel */}
-        <div className="control-panel">
-          <button className="btn-primary" onClick={handleGenerateSchedule} disabled={loading}>
-            {loading ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+          <Navbar
+              onGenerate={handleGenerate}
+              loading={loading}
+              employeeCount={employees.length}
+              shiftCount={shifts.length}
+          />
+
+          <main style={{ padding: '28px', maxWidth: '1400px', width: '100%', margin: '0 auto' }}>
+            {/* TAB 1: SCHEDULE GRID */}
+            {activeTab === 'schedule' && (
                 <>
-                  <div className="spinner"></div>
-                  Computing...
-                </>
-            ) : (
-                <>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                  </svg>
-                  Auto-Generate Schedule
+                  <MetricsOverview employees={employees} shifts={shifts} assignments={assignments} />
+                  <SolverConsole statusMessage={statusMessage} loading={loading} />
+                  <SchedulerGrid
+                      shifts={shifts}
+                      employees={employees}
+                      assignments={assignments}
+                      selectedEmployeeId={selectedEmployeeId}
+                      setSelectedEmployeeId={setSelectedEmployeeId}
+                      onSlotClick={handleSlotClick}
+                      loading={loading}
+                  />
                 </>
             )}
-          </button>
 
-          <div className="action-group">
-            <label htmlFor="emp-select" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Manual Override:
-            </label>
-            <div className="select-wrapper">
-              <select
-                  id="emp-select"
-                  className="custom-select"
-                  value={selectedEmployeeId}
-                  onChange={e => setSelectedEmployeeId(e.target.value)}
-              >
-                <option value="">-- Choose Staff Member --</option>
-                {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} ({emp.role} • {emp.maxWeeklyHours || emp.max_weekly_hours}h max)
-                    </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
+            {/* TAB 2: WORKFORCE ROSTER */}
+            {activeTab === 'roster' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div>
+                      <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>Workforce Roster</h2>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Managed active staff members and constraints</p>
+                    </div>
+                    <div style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                      Total Pool: {employees.length} Members
+                    </div>
+                  </div>
 
-        {/* Dynamic Status / Rejection Toast Banner */}
-        {statusMessage.text && (
-            <div className={`toast-banner ${statusMessage.type}`}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <span className="rule-code">{statusMessage.rule}</span>
-                <span style={{ fontSize: '14px', fontWeight: 500 }}>{statusMessage.text}</span>
-              </div>
-            </div>
-        )}
-
-        {/* 7x2 Grid Schedule Table */}
-        <div className="grid-card">
-          <table className="schedule-table">
-            <thead>
-            <tr>
-              <th className="slot-label-cell">Slot</th>
-              {DAYS.map(day => <th key={day}>{day}</th>)}
-            </tr>
-            </thead>
-            <tbody>
-            {SLOTS.map(slot => (
-                <tr key={slot}>
-                  <td className="slot-label-cell">{slot}</td>
-                  {DAYS.map(day => {
-                    const shift = getShift(day, slot);
-                    const assigned = shift ? getAssignedEmployees(shift.id) : [];
-                    return (
-                        <td
-                            key={day + slot}
-                            className="grid-cell-interactive"
-                            onClick={() => shift && handleSlotClick(shift)}
-                            title="Click to perform live constraint evaluation and assign staff"
-                        >
-                          {assigned.length > 0 ? (
-                              assigned.map(emp => (
-                                  <div key={emp.id} className="assignment-chip">
-                                    <span className="chip-name">{emp.name}</span>
-                                    <span className="chip-role">{emp.role}</span>
-                                  </div>
-                              ))
-                          ) : (
-                              <div className="empty-cell-placeholder">
-                                + Assign
+                  {employees.length === 0 ? (
+                      <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <Users size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                        <p>No workforce members loaded from AppSail backend.</p>
+                      </div>
+                  ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                        {employees.map(emp => (
+                            <div key={emp.id} className="glass-card" style={{ padding: '18px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '14px', color: '#fff' }}>
+                                  {emp.name ? emp.name.charAt(0) : 'E'}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{emp.name}</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{emp.role || 'Staff'}</div>
+                                </div>
                               </div>
-                          )}
-                        </td>
-                    );
-                  })}
-                </tr>
-            ))}
-            </tbody>
-          </table>
+                              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                <span>Max Hours:</span>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-cyan)' }}>{emp.maxWeeklyHours || emp.max_weekly_hours || 40}h / wk</span>
+                              </div>
+                            </div>
+                        ))}
+                      </div>
+                  )}
+                </div>
+            )}
+
+            {/* TAB 3: SOLVER ENGINE */}
+            {activeTab === 'solver' && (
+                <div>
+                  <div style={{ marginBottom: '20px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>Constraint Solver Engine</h2>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Algorithmic rules and backend solver pipeline configuration</p>
+                  </div>
+
+                  <SolverConsole statusMessage={statusMessage} loading={loading} />
+
+                  <div className="glass-panel" style={{ padding: '24px', marginTop: '20px' }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ShieldCheck size={18} color="var(--accent-emerald)" /> Active Hard Constraints
+                    </h3>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {[
+                        { title: 'Maximum Weekly Hours Limit', detail: 'Ensures no employee exceeds designated weekly maximum hours.', status: 'Active' },
+                        { title: 'Rest Period Enforcement', detail: 'Prevents scheduling Evening shift followed immediately by next morning Morning shift.', status: 'Active' },
+                        { title: 'Unavailability Blackout Windows', detail: 'Strictly respects non-working slots declared by employees.', status: 'Active' },
+                        { title: 'Single Assignment Per Slot', detail: 'Guarantees an employee is assigned at most once per shift slot.', status: 'Active' }
+                      ].map((rule, i) => (
+                          <div key={i} style={{ padding: '12px 16px', background: 'var(--bg-app)', borderRadius: '8px', border: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{rule.title}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{rule.detail}</div>
+                            </div>
+                            <span style={{ fontSize: '11px', fontWeight: 600, padding: '4px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
+                        {rule.status}
+                      </span>
+                          </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+            )}
+
+            {/* TAB 4: SYSTEM AUDIT */}
+            {activeTab === 'activity' && (
+                <div>
+                  <div style={{ marginBottom: '20px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>System Audit & Logs</h2>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Real-time execution log stream from AppSail engine</p>
+                  </div>
+
+                  <div className="glass-panel" style={{ padding: '20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+                      {auditLogs.map((log) => (
+                          <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--bg-app)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                            <Clock size={14} color="var(--text-muted)" />
+                            <span style={{ color: 'var(--text-muted)', minWidth: '85px' }}>{log.time}</span>
+                            <span style={{
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              background: log.level === 'error' ? 'rgba(244, 63, 94, 0.2)' : log.level === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)',
+                              color: log.level === 'error' ? 'var(--accent-rose)' : log.level === 'success' ? 'var(--accent-emerald)' : 'var(--accent-primary)',
+                              minWidth: '110px',
+                              textAlign: 'center'
+                            }}>
+                        {log.event}
+                      </span>
+                            <span style={{ color: 'var(--text-secondary)' }}>{log.details}</span>
+                          </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+            )}
+          </main>
         </div>
       </div>
   );
